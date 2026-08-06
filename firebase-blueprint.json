@@ -1,0 +1,64 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "Stores user-specific data including progress and settings.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "streak": { "type": "number", "description": "Current daily streak" },
+        "lastActive": { "type": "string", "format": "date-time" },
+        "totalCorrect": { "type": "number" },
+        "totalMistakes": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Session": {
+      "title": "Quiz Session",
+      "description": "Records a single quiz session's results.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "surahNumber": { "type": "number" },
+        "ayahRange": { "type": "string", "description": "e.g., '1-10'" },
+        "mode": { "type": "string", "enum": ["next-ayah", "fill-blank"] },
+        "correctCount": { "type": "number" },
+        "mistakeCount": { "type": "number" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "surahNumber", "correctCount", "mistakeCount", "timestamp"]
+    },
+    "Progress": {
+      "title": "Ayah Progress",
+      "description": "Tracks performance on specific Ayat.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "surahNumber": { "type": "number" },
+        "ayahNumber": { "type": "number" },
+        "correctCount": { "type": "number" },
+        "mistakeCount": { "type": "number" },
+        "lastAttempt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "surahNumber", "ayahNumber"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents"
+    },
+    "/users/{userId}/sessions/{sessionId}": {
+      "schema": "Session",
+      "description": "User quiz history"
+    },
+    "/users/{userId}/progress/{progressId}": {
+      "schema": "Progress",
+      "description": "Detailed progress per Ayah"
+    }
+  }
+}

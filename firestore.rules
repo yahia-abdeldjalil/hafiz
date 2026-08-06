@@ -1,0 +1,108 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}
+    // Fields:
+    //   - uid: string (required)
+    //   - displayName: string
+    //   - email: string (required)
+    //   - photoURL: string
+    //   - streak: number
+    //   - lastActive: string (ISO 8601)
+    //   - totalCorrect: number
+    //   - totalMistakes: number
+    //   - createdAt: string (ISO 8601)
+    //
+    // Collection: /users/{userId}/sessions/{sessionId}
+    // Fields:
+    //   - userId: string (required)
+    //   - surahNumber: number (required)
+    //   - ayahRange: string
+    //   - mode: string (next-ayah, fill-blank)
+    //   - correctCount: number (required)
+    //   - mistakeCount: number (required)
+    //   - timestamp: string (ISO 8601)
+    //
+    // Collection: /users/{userId}/progress/{progressId}
+    // Fields:
+    //   - userId: string (required)
+    //   - surahNumber: number (required)
+    //   - ayahNumber: number (required)
+    //   - correctCount: number
+    //   - mistakeCount: number
+    //   - lastAttempt: string (ISO 8601)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email']) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             (!('streak' in data) || data.streak is number) &&
+             (!('totalCorrect' in data) || data.totalCorrect is number) &&
+             (!('totalMistakes' in data) || data.totalMistakes is number);
+    }
+
+    function isValidSession(data) {
+      return data.keys().hasAll(['userId', 'surahNumber', 'correctCount', 'mistakeCount', 'timestamp']) &&
+             data.userId == request.auth.uid &&
+             data.surahNumber is number &&
+             data.correctCount is number &&
+             data.mistakeCount is number &&
+             isValidDateString(data.timestamp);
+    }
+
+    function isValidProgress(data) {
+      return data.keys().hasAll(['userId', 'surahNumber', 'ayahNumber']) &&
+             data.userId == request.auth.uid &&
+             data.surahNumber is number &&
+             data.ayahNumber is number;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+
+      match /sessions/{sessionId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidSession(request.resource.data);
+      }
+
+      match /progress/{progressId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidProgress(request.resource.data);
+        allow update: if isOwner(userId) && isValidProgress(request.resource.data);
+      }
+    }
+  }
+}
