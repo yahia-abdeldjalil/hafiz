@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
+import { LanguageProvider, useLanguage } from './LanguageContext';
 import Navbar from './components/Navbar';
 import SurahSelector from './components/SurahSelector';
 import Quiz from './components/Quiz';
@@ -10,8 +11,9 @@ import { quranService } from './services/quranService';
 import { motion, AnimatePresence } from 'motion/react';
 import { BookOpen, Brain, Sparkles, LogIn, Trophy } from 'lucide-react';
 
-const Home: React.FC = () => {
+const HomeContent: React.FC = () => {
   const { user, signIn } = useAuth();
+  const { t, language } = useLanguage();
   const [selectedSurah, setSelectedSurah] = useState<Surah | null>(null);
   const [ayahs, setAyahs] = useState<Ayah[]>([]);
   const [mode, setMode] = useState<'next-ayah' | 'fill-blank' | null>(null);
@@ -42,19 +44,19 @@ const Home: React.FC = () => {
             <BookOpen className="text-white w-12 h-12" />
           </div>
           <h1 className="text-5xl font-bold text-emerald-900 tracking-tight">
-            Master the Quran, <br />
-            <span className="text-emerald-600">One Ayah at a Time.</span>
+            {t('heroTitlePre')} <br />
+            <span className="text-emerald-600">{t('heroTitleSub')}</span>
           </h1>
           <p className="text-xl text-gray-500 max-w-2xl mx-auto leading-relaxed">
-            Hafiz is an interactive platform designed to help you memorize and review the Quran effectively using modern learning techniques.
+            {t('heroSubtitle')}
           </p>
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {[
-            { icon: Brain, title: 'Interactive Quizzes', desc: 'Test your memory with "Next Ayah" and "Fill-in-the-Blank" modes.' },
-            { icon: Sparkles, title: 'Adaptive Learning', desc: 'Our system identifies your weak areas and suggests review sessions.' },
-            { icon: Trophy, title: 'Track Progress', desc: 'Visualize your growth with detailed charts and daily streaks.' },
+            { icon: Brain, title: t('featureQuizzesTitle'), desc: t('featureQuizzesDesc') },
+            { icon: Sparkles, title: t('featureAdaptiveTitle'), desc: t('featureAdaptiveDesc') },
+            { icon: Trophy, title: t('featureTrackTitle'), desc: t('featureTrackDesc') },
           ].map((feature, i) => (
             <motion.div
               key={i}
@@ -78,7 +80,7 @@ const Home: React.FC = () => {
           onClick={signIn}
           className="inline-flex items-center px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold text-lg hover:bg-emerald-700 shadow-xl shadow-emerald-100 transition-all gap-2"
         >
-          <LogIn className="w-5 h-5" /> Start Your Journey
+          <LogIn className="w-5 h-5 rtl:rotate-180" /> {t('startJourney')}
         </motion.button>
       </div>
     );
@@ -88,7 +90,7 @@ const Home: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center h-96 space-y-4">
         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-600"></div>
-        <p className="text-emerald-600 font-medium animate-pulse">Fetching Quranic data...</p>
+        <p className="text-emerald-600 font-medium animate-pulse">{t('fetchingQuran')}</p>
       </div>
     );
   }
@@ -114,30 +116,32 @@ const Home: React.FC = () => {
             className="max-w-2xl mx-auto bg-white p-10 rounded-3xl shadow-xl border border-emerald-50 space-y-8"
           >
             <div className="text-center space-y-2">
-              <h2 className="text-3xl font-bold text-emerald-900">Select Practice Mode</h2>
-              <p className="text-gray-500">How would you like to practice Surah {selectedSurah.englishName}?</p>
+              <h2 className="text-3xl font-bold text-emerald-900">{t('selectMode')}</h2>
+              <p className="text-gray-500">
+                {t('selectModeDesc')} {language === 'ar' ? selectedSurah.name : selectedSurah.englishName}?
+              </p>
             </div>
 
             <div className="grid grid-cols-1 gap-4">
               <button
                 onClick={() => {
                   if (ayahs.length < 2) {
-                    alert('Next Ayah mode requires at least 2 Ayat in the range.');
+                    alert(t('nextAyahAlert'));
                     return;
                   }
                   setMode('next-ayah');
                 }}
-                className="p-6 bg-emerald-50 border-2 border-emerald-100 rounded-2xl text-left hover:border-emerald-500 transition-all group"
+                className="p-6 bg-emerald-50 border-2 border-emerald-100 rounded-2xl text-left rtl:text-right hover:border-emerald-500 transition-all group"
               >
-                <h3 className="text-xl font-bold text-emerald-900 group-hover:text-emerald-600">Next Ayah Quiz</h3>
-                <p className="text-sm text-gray-600">We show an Ayah, you pick the one that follows it correctly.</p>
+                <h3 className="text-xl font-bold text-emerald-900 group-hover:text-emerald-600">{t('nextAyahMode')}</h3>
+                <p className="text-sm text-gray-600">{t('nextAyahDesc')}</p>
               </button>
               <button
                 onClick={() => setMode('fill-blank')}
-                className="p-6 bg-emerald-50 border-2 border-emerald-100 rounded-2xl text-left hover:border-emerald-500 transition-all group"
+                className="p-6 bg-emerald-50 border-2 border-emerald-100 rounded-2xl text-left rtl:text-right hover:border-emerald-500 transition-all group"
               >
-                <h3 className="text-xl font-bold text-emerald-900 group-hover:text-emerald-600">Fill in the Blank</h3>
-                <p className="text-sm text-gray-600">We hide a word from the Ayah, and you have to type it correctly.</p>
+                <h3 className="text-xl font-bold text-emerald-900 group-hover:text-emerald-600">{t('fillBlankMode')}</h3>
+                <p className="text-sm text-gray-600">{t('fillBlankDesc')}</p>
               </button>
             </div>
 
@@ -145,7 +149,7 @@ const Home: React.FC = () => {
               onClick={() => setSelectedSurah(null)}
               className="w-full py-4 text-gray-500 font-medium hover:text-emerald-600 transition-colors"
             >
-              Cancel and choose another Surah
+              {t('cancelChooseAnother')}
             </button>
           </motion.div>
         ) : (
@@ -170,6 +174,15 @@ const Home: React.FC = () => {
   );
 };
 
+const FooterContent: React.FC = () => {
+  const { t } = useLanguage();
+  return (
+    <footer className="py-8 text-center text-gray-400 text-sm">
+      <p>© {new Date().getFullYear()} {t('footerRights')}</p>
+    </footer>
+  );
+};
+
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth();
   if (loading) return null;
@@ -180,27 +193,27 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 export default function App() {
   return (
     <AuthProvider>
-      <Router>
-        <div className="min-h-screen flex flex-col">
-          <Navbar />
-          <main className="flex-1">
-            <Routes>
-              <Route path="/" element={<Home />} />
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                }
-              />
-            </Routes>
-          </main>
-          <footer className="py-8 text-center text-gray-400 text-sm">
-            <p>© {new Date().getFullYear()} Hafiz - Quran Memorization Assistant</p>
-          </footer>
-        </div>
-      </Router>
+      <LanguageProvider>
+        <Router>
+          <div className="min-h-screen flex flex-col bg-gray-50/50">
+            <Navbar />
+            <main className="flex-1">
+              <Routes>
+                <Route path="/" element={<HomeContent />} />
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
+              </Routes>
+            </main>
+            <FooterContent />
+          </div>
+        </Router>
+      </LanguageProvider>
     </AuthProvider>
   );
 }

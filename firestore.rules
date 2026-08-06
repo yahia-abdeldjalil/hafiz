@@ -82,14 +82,18 @@ service cloud.firestore {
       return data.keys().hasAll(['userId', 'surahNumber', 'ayahNumber']) &&
              data.userId == request.auth.uid &&
              data.surahNumber is number &&
-             data.ayahNumber is number;
+             data.ayahNumber is number &&
+             (!('interval' in data) || data.interval is number) &&
+             (!('repetition' in data) || data.repetition is number) &&
+             (!('easeFactor' in data) || data.easeFactor is number) &&
+             (!('nextReview' in data) || isValidDateString(data.nextReview));
     }
 
     // ===============================================================
     // Rules
     // ===============================================================
     match /users/{userId} {
-      allow read: if isOwner(userId);
+      allow read: if isAuthenticated();
       allow create: if isOwner(userId) && isValidUser(request.resource.data);
       allow update: if isOwner(userId) && isValidUser(request.resource.data);
 

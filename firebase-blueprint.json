@@ -34,7 +34,7 @@
     },
     "Progress": {
       "title": "Ayah Progress",
-      "description": "Tracks performance on specific Ayat.",
+      "description": "Tracks performance and SRS review schedule on specific Ayat.",
       "type": "object",
       "properties": {
         "userId": { "type": "string" },
@@ -42,7 +42,11 @@
         "ayahNumber": { "type": "number" },
         "correctCount": { "type": "number" },
         "mistakeCount": { "type": "number" },
-        "lastAttempt": { "type": "string", "format": "date-time" }
+        "lastAttempt": { "type": "string", "format": "date-time" },
+        "interval": { "type": "number" },
+        "repetition": { "type": "number" },
+        "easeFactor": { "type": "number" },
+        "nextReview": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "surahNumber", "ayahNumber"]
     }

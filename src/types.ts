@@ -47,4 +47,9 @@ export interface AyahProgress {
   correctCount: number;
   mistakeCount: number;
   lastAttempt: string;
+  interval?: number;
+  repetition?: number;
+  easeFactor?: number;
+  nextReview?: string;
 }
+

@@ -1,10 +1,12 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Ayah, Surah } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, XCircle, ArrowRight, RotateCcw, Home, Play, Pause, Volume2 } from 'lucide-react';
-import { doc, setDoc, updateDoc, increment, collection, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, increment, collection, addDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../AuthContext';
+import { calculateNextSRS, SRSState } from '../utils/srs';
+import { useLanguage } from '../LanguageContext';
 
 interface QuizProps {
   surah: Surah;
@@ -15,6 +17,7 @@ interface QuizProps {
 
 const Quiz: React.FC<QuizProps> = ({ surah, ayahs, mode, onFinish }) => {
   const { user } = useAuth();
+  const { t, language, isRTL } = useLanguage();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [options, setOptions] = useState<string[]>([]);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -34,9 +37,11 @@ const Quiz: React.FC<QuizProps> = ({ surah, ayahs, mode, onFinish }) => {
 
   if (!currentAyah) {
     return (
-      <div className="max-w-2xl mx-auto p-8 text-center bg-white rounded-3xl shadow-xl border border-emerald-50">
-        <p className="text-gray-500">No Ayat found in this range. Please try another selection.</p>
-        <button onClick={onFinish} className="mt-4 text-emerald-600 font-bold">Go Back</button>
+      <div className="max-w-2xl mx-auto p-8 text-center bg-white rounded-3xl shadow-xl border border-emerald-50 space-y-4">
+        <p className="text-gray-500">{t('noAyatFound')}</p>
+        <button onClick={onFinish} className="px-6 py-2 bg-emerald-600 text-white rounded-xl font-bold">
+          {t('goBack')}
+        </button>
       </div>
     );
   }
@@ -123,13 +128,36 @@ const Quiz: React.FC<QuizProps> = ({ surah, ayahs, mode, onFinish }) => {
     const progressRef = doc(db, 'users', user.uid, 'progress', progressId);
     
     try {
-      const docSnap = await setDoc(progressRef, {
+      const existingSnap = await getDoc(progressRef);
+      let currentState: Partial<SRSState> = {};
+      let prevCorrect = 0;
+      let prevMistakes = 0;
+
+      if (existingSnap.exists()) {
+        const data = existingSnap.data();
+        currentState = {
+          interval: data.interval,
+          repetition: data.repetition,
+          easeFactor: data.easeFactor,
+          nextReview: data.nextReview,
+        };
+        prevCorrect = data.correctCount || 0;
+        prevMistakes = data.mistakeCount || 0;
+      }
+
+      const srsMetrics = calculateNextSRS(correct, currentState);
+
+      await setDoc(progressRef, {
         userId: user.uid,
         surahNumber: surah.number,
         ayahNumber: ayahNum,
-        correctCount: increment(correct ? 1 : 0),
-        mistakeCount: increment(correct ? 0 : 1),
-        lastAttempt: new Date().toISOString()
+        correctCount: prevCorrect + (correct ? 1 : 0),
+        mistakeCount: prevMistakes + (correct ? 0 : 1),
+        lastAttempt: new Date().toISOString(),
+        interval: srsMetrics.interval,
+        repetition: srsMetrics.repetition,
+        easeFactor: srsMetrics.easeFactor,
+        nextReview: srsMetrics.nextReview,
       }, { merge: true });
 
       await updateDoc(doc(db, 'users', user.uid), {
@@ -177,21 +205,23 @@ const Quiz: React.FC<QuizProps> = ({ surah, ayahs, mode, onFinish }) => {
         className="max-w-2xl mx-auto bg-white p-8 rounded-3xl shadow-2xl border border-emerald-50 text-center space-y-8"
       >
         <div className="space-y-2">
-          <h2 className="text-3xl font-bold text-emerald-900">Session Complete!</h2>
-          <p className="text-gray-500">Great job practicing Surah {surah.englishName}.</p>
+          <h2 className="text-3xl font-bold text-emerald-900">{t('sessionComplete')}</h2>
+          <p className="text-gray-500">
+            {t('greatJob')} {language === 'ar' ? surah.name : surah.englishName}.
+          </p>
         </div>
 
         <div className="grid grid-cols-3 gap-4">
           <div className="p-4 bg-emerald-50 rounded-2xl">
-            <p className="text-sm text-emerald-600 font-medium">Correct</p>
+            <p className="text-sm text-emerald-600 font-medium">{t('correct')}</p>
             <p className="text-2xl font-bold text-emerald-900">{correctCount}</p>
           </div>
           <div className="p-4 bg-red-50 rounded-2xl">
-            <p className="text-sm text-red-600 font-medium">Mistakes</p>
+            <p className="text-sm text-red-600 font-medium">{t('mistakes')}</p>
             <p className="text-2xl font-bold text-red-900">{mistakeCount}</p>
           </div>
           <div className="p-4 bg-blue-50 rounded-2xl">
-            <p className="text-sm text-blue-600 font-medium">Accuracy</p>
+            <p className="text-sm text-blue-600 font-medium">{t('accuracy')}</p>
             <p className="text-2xl font-bold text-blue-900">{accuracy}%</p>
           </div>
         </div>
@@ -201,13 +231,13 @@ const Quiz: React.FC<QuizProps> = ({ surah, ayahs, mode, onFinish }) => {
             onClick={() => window.location.reload()}
             className="flex-1 py-4 bg-gray-100 text-gray-700 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-gray-200 transition-all"
           >
-            <RotateCcw className="w-5 h-5" /> Practice Again
+            <RotateCcw className="w-5 h-5" /> {t('practiceAgain')}
           </button>
           <button
             onClick={onFinish}
             className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all"
           >
-            <Home className="w-5 h-5" /> Finish
+            <Home className="w-5 h-5" /> {t('finish')}
           </button>
         </div>
       </motion.div>
@@ -218,8 +248,12 @@ const Quiz: React.FC<QuizProps> = ({ surah, ayahs, mode, onFinish }) => {
     <div className="max-w-4xl mx-auto p-4 space-y-8">
       <div className="flex justify-between items-center">
         <div className="space-y-1">
-          <h2 className="text-xl font-bold text-emerald-900">{surah.englishName}</h2>
-          <p className="text-sm text-gray-500">Ayah {currentAyah.numberInSurah} of {surah.numberOfAyahs}</p>
+          <h2 className="text-xl font-bold text-emerald-900">
+            {language === 'ar' ? surah.name : surah.englishName}
+          </h2>
+          <p className="text-sm text-gray-500">
+            {t('ayah')} {currentAyah.numberInSurah} {t('of')} {surah.numberOfAyahs}
+          </p>
         </div>
         <div className="flex gap-4 text-sm font-medium">
           <span className="text-emerald-600">✓ {correctCount}</span>
@@ -242,9 +276,9 @@ const Quiz: React.FC<QuizProps> = ({ surah, ayahs, mode, onFinish }) => {
         className="bg-white p-8 rounded-3xl shadow-xl border border-emerald-50 space-y-8"
       >
         <div className="text-center space-y-6">
-          <div className="flex items-center justify-center gap-4">
+          <div className="flex items-center justify-center gap-4 flex-wrap">
             <p className="text-sm font-medium text-emerald-600 uppercase tracking-wider">
-              {mode === 'next-ayah' ? 'What comes next?' : 'Fill in the blank'}
+              {mode === 'next-ayah' ? t('whatComesNext') : t('fillInBlankPrompt')}
             </p>
             <div className="flex items-center gap-2 bg-emerald-50/50 p-1.5 rounded-full border border-emerald-100">
               <button
@@ -252,11 +286,11 @@ const Quiz: React.FC<QuizProps> = ({ surah, ayahs, mode, onFinish }) => {
                 className={`p-2.5 rounded-full transition-all shadow-sm ${
                   isPlaying ? 'bg-emerald-600 text-white animate-pulse' : 'bg-white text-emerald-600 hover:bg-emerald-50'
                 }`}
-                title={isPlaying ? 'Pause Recitation' : 'Play Recitation'}
+                title={isPlaying ? t('pauseRecitation') : t('playRecitation')}
               >
                 {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
               </button>
-              <div className="flex items-center gap-2 px-3 border-l border-emerald-100">
+              <div className="flex items-center gap-2 px-3 border-l rtl:border-r rtl:border-l-0 border-emerald-100">
                 <Volume2 className="w-4 h-4 text-emerald-600" />
                 <input
                   type="range"
@@ -271,7 +305,7 @@ const Quiz: React.FC<QuizProps> = ({ surah, ayahs, mode, onFinish }) => {
             </div>
           </div>
           <div 
-            className="font-arabic text-4xl leading-relaxed text-emerald-900 text-right cursor-pointer hover:text-emerald-700 transition-colors" 
+            className="font-arabic text-4xl leading-relaxed text-emerald-900 text-right rtl:text-right cursor-pointer hover:text-emerald-700 transition-colors" 
             dir="rtl"
             onClick={toggleAudio}
           >
@@ -308,7 +342,7 @@ const Quiz: React.FC<QuizProps> = ({ surah, ayahs, mode, onFinish }) => {
             <div className="relative">
               <input
                 type="text"
-                placeholder="Type the missing word..."
+                placeholder={t('typeMissingWord')}
                 className="w-full p-6 text-right font-arabic text-2xl bg-gray-50 border-2 border-emerald-50 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all"
                 dir="rtl"
                 value={userInput}
@@ -318,7 +352,7 @@ const Quiz: React.FC<QuizProps> = ({ surah, ayahs, mode, onFinish }) => {
               />
               {selectedOption && (
                 <div className="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-right font-arabic text-xl text-emerald-800" dir="rtl">
-                  Correct word: {blankWord}
+                  {t('correctWord')}: {blankWord}
                 </div>
               )}
             </div>
@@ -327,7 +361,7 @@ const Quiz: React.FC<QuizProps> = ({ surah, ayahs, mode, onFinish }) => {
                 onClick={handleFillSubmit}
                 className="w-full py-4 bg-emerald-600 text-white rounded-2xl font-bold text-lg hover:bg-emerald-700 transition-all"
               >
-                Check Answer
+                {t('checkAnswer')}
               </button>
             )}
           </div>
@@ -342,16 +376,16 @@ const Quiz: React.FC<QuizProps> = ({ surah, ayahs, mode, onFinish }) => {
             >
               <div className={`flex items-center gap-2 font-bold ${isCorrect ? 'text-emerald-600' : 'text-red-500'}`}>
                 {isCorrect ? (
-                  <><CheckCircle2 className="w-6 h-6" /> Correct!</>
+                  <><CheckCircle2 className="w-6 h-6" /> {t('correct')}</>
                 ) : (
-                  <><XCircle className="w-6 h-6" /> Incorrect</>
+                  <><XCircle className="w-6 h-6" /> {t('incorrect')}</>
                 )}
               </div>
               <button
                 onClick={handleNext}
                 className="w-full py-4 bg-emerald-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-black transition-all"
               >
-                Next Ayah <ArrowRight className="w-5 h-5" />
+                {t('nextAyah')} <ArrowRight className={`w-5 h-5 ${isRTL ? 'rotate-180' : ''}`} />
               </button>
             </motion.div>
           )}
